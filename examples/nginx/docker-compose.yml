@@ -1,0 +1,28 @@
+version: "3.9"
+services:
+  certbot:
+    image: nbraun1/certbot
+    container_name: certbot
+    depends_on:
+      - nginx
+    environment:
+      EMAIL: your@email.com
+      DOMAINS: example.com,www.example.com
+      AUTHENTICATOR: webroot
+      WEBROOT_PATH: /var/www/letsencrypt
+      POST_HOOK_CMD: docker kill -s HUP $$(docker ps --filter "name=webserver" | awk '{print $$1}')
+      CRON: "* * * * *"
+    volumes:
+      - ./data/certbot/letsencrypt:/etc/letsencrypt
+      - ./data/certbot/www:/var/www/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+  nginx:
+    image: nginx
+    container_name: webserver
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./config:/etc/nginx/conf.d:ro
+      - ./data/certbot/letsencrypt:/etc/letsencrypt:ro
+      - ./data/certbot/www:/var/www/letsencrypt:ro

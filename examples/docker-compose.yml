@@ -1,0 +1,12 @@
+version: "3.9"
+services:
+  certbot:
+    image: nbraun1/certbot
+    environment:
+      EMAIL: your@email.com
+      DOMAINS: example.com,www.example.com
+      RUN_ONCE: 1
+    ports:
+      - 80:80
+    volumes:
+      - ./data/certbot:/etc/letsencrypt

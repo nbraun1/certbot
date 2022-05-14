@@ -1,0 +1,7 @@
+examples
+.docker-password.txt
+Makefile
+README.md
+LICENSE.txt
+.git
+.vscode

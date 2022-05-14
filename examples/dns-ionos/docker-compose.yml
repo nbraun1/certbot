@@ -1,0 +1,16 @@
+version: "3.9"
+services:
+  certbot:
+    image: nbraun1/certbot
+    environment:
+      EMAIL: your@email.com
+      DOMAINS: example.com,www.example.com
+      AUTHENTICATOR: dns-ionos
+      DNS_AUTHENTICATOR_CREDENTIALS: /etc/letsencrypt/.secrets/certbot/dns-ionos.ini
+      DNS_PROPAGATION_SECONDS: 10
+      # https://github.com/helgeerbe/certbot-dns-ionos
+      DNS_PLUGINS: certbot-dns-ionos
+      RUN_ONCE: 1
+    volumes:
+      - ./data/certbot:/etc/letsencrypt
+      - ./dns-ionos.ini:/etc/letsencrypt/.secrets/certbot/dns-ionos.ini
