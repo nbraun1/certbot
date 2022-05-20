@@ -1,0 +1,11 @@
+version: "3.9"
+services:
+  certbot:
+    image: nbraun1/certbot
+    environment:
+      ENABLE_MULTI_CERTIFICATES: 1
+    ports:
+      - 80:80
+    volumes:
+      - ./data/certbot:/etc/letsencrypt
+      - ./example.ini:/etc/certbot/multi-certificates.ini

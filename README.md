@@ -15,11 +15,16 @@ Open Source and free to use [certbot][1] for Docker environments to automate the
 - Install [certbot's DNS plugins](https://eff-certbot.readthedocs.io/en/stable/using.html#dns-plugins) with [pip][3] when starting the Docker container
 - Efficient signal handling with [Tini](https://github.com/krallin/tini)
 - Highly configurable with [environment variables](#environment-variables)
+- Capable to obtain and automatically renew [multiple certificates](#multiple-certificates) (since version 1.1.0)
 
 # Table of Contents
 - [Getting Started](#getting-started)
   - [Run with docker run](#run-with-docker-run)
   - [Run with docker compose](#run-with-docker-compose)
+- [Multiple Certificates](#multiple-certificates)
+  - [Basic Setup](#basic-setup)
+  - [INI File](#ini-file)
+  - [Technical Background Knowledge](#technical-background-knowledge)
 - [Environment Variables](#environment-variables)
   - [Required](#required)
   - [Optional](#optional)
@@ -62,9 +67,33 @@ docker run -it -p 80:81 -v $(pwd)/data/certbot:/etc/letsencrypt \
 ```
 [Certbot][1] listens to port 81 in the Docker container but is mapped as port 80 to the host in order to be reachable for a ACME server.
 
+Run [certbot][1] for multiple certificates:
+```bash
+docker run -it -p 80:80 \
+-v $(pwd)/data/certbot:/etc/letsencrypt \
+-v $(pwd)/example.ini:/etc/certbot/multi-certificates.ini \
+-e ENABLE_MULTI_CERTIFICATES=1 \
+--name certbot nbraun1/certbot
+```
+For detailed information how the multi-certificates feature works, read the [multiple certificates](#multiple-certificates) section.
+
 ## Run with `docker compose`
 For an example to run [certbot][1] in Docker Compose consult our [docker-compose.yml](./examples/docker-compose.yml). In order to start the [certbot][1] run `docker compose up` in your command line. More examples can be found in the [examples directory](./examples/).
 > Note that we use [Docker Compose V2](https://docs.docker.com/compose/#compose-v2-and-the-new-docker-compose-command) for this example.
+
+# Multiple Certificates
+Are you tired of running multiple `docker run` commands for the same [certbot][1] Docker image to obtain or renew multiple certificates? Or repeat your [certbot][1] service in your docker-compose.yml where each of them manage a separate domain? Or write the ugly configuration for one [certbot][1] service to force a semi multi-certificates feature? Our [Docker image](https://hub.docker.com/r/nbraun1/certbot) provides a much simpler and more pleasant way!
+
+## Basic Setup
+Our multi-certificates feature is based on an INI file which is written by you. For an simple example have a look at our pre-defined [example.ini](./examples/multi-certificates/example.ini) file. This whole feature is optional, means that you can decide with the `ENABLE_MULTI_CERTIFICATES` environment variable if you enable or disable it. In the [run with docker run](#run-with-docker-run) section you safely noticed that an additional volume is used when running with an defined `ENABLE_MULTI_CERTIFICATES` environment variable. This volume only contains the INI file and is located at `/etc/certbot/multi-certificates.ini` in the Docker container by default. That location can be changed with the `MULTI_CERTIFICATES_INI_FILE` environment variable.
+
+## INI File
+The INI file contains one optional *DEFAULT* section and one or more domain specific sections. Each option defined in the *DEFAULT* section is applied to the domain specific section options. If a *DEFAULT* option is the same as the domain specific one, the domain specific one overrides the *DEFAULT* one and is used. Possible options and its values are the environment variables defined in the corresponding [section](#environment-variables).
+
+## Technical Background Knowledge
+Reading this section is not mandatory to understand the multi-certificates feature but might be helpfully if you are interested in general technical background knowledge.
+
+To parse the INI file we use Python and **not** Bash! You might be wondering: "Why using Python to parse a file in a Docker container which uses Bash by default?!". The answer is really simple. There are a handful existing INI file parsers available in GitHub but most of these are either a (dirty) hack, incomplete, do not work or do not meet our requirements. The alternatives are e.g *awk* or *sed* scripts but we think this kind of solution is not maintainable, not really smart and above all error prone. So we decided to use Python and its [config parser](https://docs.python.org/3/library/configparser.html) module to parse the INI file.
 
 # Environment Variables
 This section is partially based on the official [certbot command line options](https://eff-certbot.readthedocs.io/en/stable/using.html#certbot-command-line-options) documentation. Most of the environment variables defaults to an empty string which is in most cases equivalent to a boolean `false`. If you wish to set this environment variable to a boolean `true`, leave its value to `1` or any other non-empty string. There are also some environment variables wish require a string or number but each of them have a well documentation to describe its expectation.
@@ -141,15 +170,6 @@ This section is partially based on the official [certbot command line options](h
 `ELLIPTIC_CURVE`
 > The SECG [elliptic curve](https://datatracker.ietf.org/doc/html/rfc8446#section-7.4.2) name to use. Default is secp256r1.
 ---
-`CONFIG_DIR`
-> Configuration directory. Default is /etc/letsencrypt.
----
-`WORK_DIR`
-> Working directory. Default is /var/lib/letsencrypt.
----
-`LOGS_DIR`
-> Logs directory. Default is /var/log/letsencrypt.
----
 `SERVER`
 > ACME Directory Resource URI. Default is `https://acme-v02.api.letsencrypt.org/directory`.
 ---
@@ -160,7 +180,7 @@ This section is partially based on the official [certbot command line options](h
 > Command to be run in a shell after attempting to obtain/renew certificates. Can be used to deploy renewed certificates or to restart any servers that were stopped by `PRE_HOOK_CMD`. This is only run if an attempt was made to obtain/renew a certificate. If multiple renewed certificates have identical post-hooks, only one will be run.
 ---
 `DEPLOY_HOOK_CMD`
-> Command to be run in a shell once for each successfully issued certificate. For this command, the shell variable *$RENEWED_LINEAGE* will point to the `CONFIG_DIR` live subdirectory (for example, "/etc/letsencrypt/live/example.com") containing the new certificates and keys; the shell variable *$RENEWED_DOMAINS* will contain a space separated list of renewed certificate domains (for example, "`example.com www.example.com`").
+> Command to be run in a shell once for each successfully issued certificate. For this command, the shell variable *$RENEWED_LINEAGE* will point to the `/etc/letsencrypt` live subdirectory (for example, "/etc/letsencrypt/live/example.com") containing the new certificates and keys; the shell variable *$RENEWED_DOMAINS* will contain a space separated list of renewed certificate domains (for example, "`example.com www.example.com`").
 ---
 `CERTBOT_CERTONLY_FLAGS`
 > Additional command line options for [certbot's][1] certonly command.
@@ -176,9 +196,16 @@ This section is partially based on the official [certbot command line options](h
 ---
 `CRON`
 > [Cron](https://crontab.guru/crontab.5.html) expression for [certbot's][1] automatically renewal. If you have no idea of how to write such an cron expression, use [crontab guru](https://crontab.guru/) to generate one.
+---
+`ENABLE_MULTI_CERTIFICATES`
+> If defined, the [multi-certificates](#multiple-certificates) feature is enabled. Disabled by default.
+---
+`MULTI_CERTIFICATES_INI_FILE`
+> Change the default INI file location from `/etc/certbot/multi-certificates.ini` to another one. Ignored if `ENABLE_MULTI_CERTIFICATES` is undefined.
 
 # Volumes
 - `/etc/letsencrypt` - stores the obtained certificates.
+- `/etc/certbot/multi-certificates.ini` - the INI file for the [multi-certificates](#multiple-certificates) feature. Must be mounted manually and is optional, i.e is not exposed by the Dockerfile.
 
 # Exposed Ports
 - 80
