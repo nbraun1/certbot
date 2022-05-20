@@ -39,9 +39,6 @@ ENV KEY_TYPE=
 ENV ELLIPTIC_CURVE=
 
 # path options
-ENV CONFIG_DIR=
-ENV WORK_DIR=
-ENV LOGS_DIR=
 ENV SERVER=
 
 # renew options
@@ -55,12 +52,15 @@ ENV CERTBOT_RENEW_FLAGS=
 ENV DNS_PLUGINS=
 ENV RUN_ONCE=
 ENV CRON="0 0,12 * * *"
+ENV ENABLE_MULTI_CERTIFICATES=
+ENV MULTI_CERTIFICATES_INI_FILE=/etc/certbot/multi-certificates.ini
 
 RUN set -ex; \
     apk add --no-cache \
     bash \
     tini \
     docker-cli \
+    python3 \
     py3-pip \
     certbot
 

@@ -125,18 +125,6 @@ if [ ! -z "$ELLIPTIC_CURVE" ]; then
 fi
 
 # add path options
-if [ ! -z "$CONFIG_DIR" ]; then
-    certbot_params+=(--config-dir "$CONFIG_DIR")
-fi
-
-if [ ! -z "$WORK_DIR" ]; then
-    certbot_params+=(--work-dir "$WORK_DIR")
-fi
-
-if [ ! -z "$LOGS_DIR" ]; then
-    certbot_params+=(--logs-dir "$LOGS_DIR")
-fi
-
 if [ ! -z "$SERVER" ]; then
     certbot_params+=(--server "$SERVER")
 fi
