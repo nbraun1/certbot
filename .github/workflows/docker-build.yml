@@ -1,0 +1,56 @@
+name: Build and Publish Docker Image
+
+on:
+  push:
+    branches:
+      - main
+      - development
+    tags:
+      - 'v*' # Matches tags like v1.0.0, v2.1.3, etc.
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Set up registry variables
+      - name: set lowercase owner name
+        run: |
+          echo "OWNER_LC=${OWNER,,}" >>${GITHUB_ENV}
+        env:
+          OWNER: "${{ github.repository_owner }}"
+      - name: set lowercase repository name
+        run: |
+          echo "REPOSITORY_LC=${REPOSITORY,,}" >>${GITHUB_ENV}
+        env:
+          REPOSITORY: "${{ github.event.repository.name }}"
+
+      # Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Log in to GitHub Container Registry (only if on master branch)
+      - name: Log in to GitHub Container Registry
+        if: github.ref == 'refs/heads/master'
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build the Docker image
+      - name: Build Docker image
+        run: |
+          docker build -t ghcr.io/${OWNER_LC}/${REPOSITORY_LC}:${{ github.ref_name || github.event.ref }} .
+
+      # Push the Docker image to GitHub Container Registry (only if on master branch)
+      - name: Push Docker image
+        if: github.ref == 'refs/heads/master'
+        run: |
+          docker push ghcr.io/${OWNER_LC}/${REPOSITORY_LC}:${{ github.ref_name }}
+
+      # Tag the Docker image as :latest and push it (only for master branch)
+      - name: Tag and Push Docker image as latest
+        if: github.ref == 'refs/heads/master'
+        run: |
+          docker tag ghcr.io/${OWNER_LC}/${REPOSITORY_LC}:${{ github.ref_name }} ghcr.io/${OWNER_LC}/${REPOSITORY_LC}:latest
+          docker push ghcr.io/${OWNER_LC}/${REPOSITORY_LC}:latest
