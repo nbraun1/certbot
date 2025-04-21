@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# source local Python virtual environment
+source /opt/venv/bin/activate
+
 # install each dns plugin which is defined in the DNS_PLUGINS
 # environment variable if not already installed
 ./scripts/install-dns-plugins.sh
