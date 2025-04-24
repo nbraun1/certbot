@@ -1,4 +1,4 @@
-FROM alpine:3.15.4
+FROM alpine:3.21.3
 LABEL maintainer="Nico Braun <nico.braun.dev@gmx.de>"
 
 # account options
@@ -61,8 +61,12 @@ RUN set -ex; \
     tini \
     docker-cli \
     python3 \
-    py3-pip \
-    certbot
+    py3-pip
+
+# install certbot from pip instead of Alpine repos
+RUN python3 -m venv /opt/venv && \
+    /opt/venv/bin/pip3 install --no-cache-dir \
+        certbot
 
 # copy each certbot relevant script including the entrypoint.sh
 # and ensure that each of them is executable
