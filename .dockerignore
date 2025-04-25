@@ -1,7 +1,9 @@
-examples
-.docker-password.txt
+examples/
 Makefile
 README.md
 LICENSE.txt
-.git
-.vscode
+.git/
+.vscode/
+.gitignore
+.github/
+.act/
