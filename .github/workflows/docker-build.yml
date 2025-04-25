@@ -12,52 +12,40 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # Set up registry variables
-      - name: set lowercase owner name
-        run: |
-          echo "OWNER_LC=${OWNER,,}" >>${GITHUB_ENV}
-        env:
-          OWNER: "${{ github.repository_owner }}"
-      - name: set lowercase repository name
-        run: |
-          echo "REPOSITORY_LC=${REPOSITORY,,}" >>${GITHUB_ENV}
-        env:
-          REPOSITORY: "${{ github.event.repository.name }}"
+      # Log in to Docker Hub (only if on master branch or tag)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ github.actor }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Checkout the repository
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      # Log in to GitHub Container Registry (only if on master branch)
+      # Log in to GitHub Container Registry (only if on master branch or tag)
       - name: Log in to GitHub Container Registry
-        if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Build the Docker image
-      - name: Build Docker image
-        run: |
-          docker build -t ghcr.io/${OWNER_LC}/${REPOSITORY_LC}:${{ github.ref_name || github.event.ref }} .
+      - name: Docker meta
+        id: docker_meta
+        uses: docker/metadata-action@v5
+        with:
+          # List of Docker images to use as base name for tags
+          images: |
+            ${{ env.OWNER }}/${{ env.REPOSITORY }}
+            ghcr.io/${{ env.OWNER }}/${{ env.REPOSITORY }}
+          # Generate Docker tags based on the following events/attributes
+          tags: |
+            type=semver,pattern={{raw}}
+            type=edge,branch=${{ github.event.repository.default_branch }}
+            type=edge,branch=development,suffix=-dev
+        env:
+          OWNER: "${{ github.repository_owner }}"
+          REPOSITORY: "${{ github.event.repository.name }}"
 
-      # Push the Docker image to GitHub Container Registry (only if on master branch)
-      - name: Push Docker image
-        if: github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')
-        run: |
-          docker push ghcr.io/${OWNER_LC}/${REPOSITORY_LC}:${{ github.ref_name }}
-
-      # Tag the Docker image as :latest and push it (only for master branch)
-      - name: Tag and Push Docker image as latest
-        if: github.ref == 'refs/heads/master'
-        run: |
-          docker tag ghcr.io/${OWNER_LC}/${REPOSITORY_LC}:${{ github.ref_name }} ghcr.io/${OWNER_LC}/${REPOSITORY_LC}:latest
-          docker push ghcr.io/${OWNER_LC}/${REPOSITORY_LC}:latest
-
-      # Push the Docker image to GitHub Container Registry (only if on tag)
-      - name: Push Docker image for tag
-        if: startsWith(github.ref, 'refs/tags/')
-        run: |
-          docker tag ghcr.io/${OWNER_LC}/${REPOSITORY_LC}:${{ github.ref_name || github.event.ref }} ghcr.io/${OWNER_LC}/${REPOSITORY_LC}:${{ github.ref_name }}
-          docker push ghcr.io/${OWNER_LC}/${REPOSITORY_LC}:${{ github.ref_name }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: ${{ steps.docker_meta.outputs.tags }}
