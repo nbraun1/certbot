@@ -28,18 +28,18 @@ fi
 
 if [ ! -z "$FORCE_RENEWAL" ]; then
     certbot_params+=(--force-renewal)
-    # add renew options
-    if [ ! -z "$PRE_HOOK_CMD" ]; then
-        certbot_params+=(--pre-hook "$PRE_HOOK_CMD")
-    fi
+fi
 
-    if [ ! -z "$POST_HOOK_CMD" ]; then
-        certbot_params+=(--post-hook "$POST_HOOK_CMD")
-    fi
+if [ ! -z "$PRE_HOOK_CMD" ]; then
+    certbot_params+=(--pre-hook "$PRE_HOOK_CMD")
+fi
 
-    if [ ! -z "$DEPLOY_HOOK_CMD" ]; then
-        certbot_params+=(--deploy-hook "$DEPLOY_HOOK_CMD")
-    fi
+if [ ! -z "$POST_HOOK_CMD" ]; then
+    certbot_params+=(--post-hook "$POST_HOOK_CMD")
+fi
+
+if [ ! -z "$DEPLOY_HOOK_CMD" ]; then
+    certbot_params+=(--deploy-hook "$DEPLOY_HOOK_CMD")
 fi
 
 if [ ! -z "$QUIET" ]; then
