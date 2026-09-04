@@ -3,7 +3,10 @@ import os
 import configparser as cp
 import subprocess as sp
 
-ini_file = os.environ['MULTI_CERTIFICATES_INI_FILE']
+ini_file = os.environ.get(
+    'MULTI_CERTIFICATES_INI_FILE',
+    '/etc/certbot/multi-certificates.ini',
+)
 # check if the file exists because the config parser ignores any errors
 # when opening and reading a file respectively
 if not os.path.exists(ini_file):

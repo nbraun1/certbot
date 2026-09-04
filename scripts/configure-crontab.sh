@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+source "$(dirname "$0")/defaults.sh"
+
 cron_script="/usr/bin/flock /tmp/certbot-renew.lock /scripts/certbot-renew.sh"
 
 # append command line options to renewal script if available

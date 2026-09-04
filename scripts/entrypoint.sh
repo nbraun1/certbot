@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+source "$(dirname "$0")/defaults.sh"
+
 # source local Python virtual environment
 source /opt/venv/bin/activate
 

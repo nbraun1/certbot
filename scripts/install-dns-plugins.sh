@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+source "$(dirname "$0")/defaults.sh"
+
 IFS="," read -ra dns_plugins <<< "$DNS_PLUGINS"
 
 for dns_plugin in "${dns_plugins[@]}"; do

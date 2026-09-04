@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+source "$(dirname "$0")/defaults.sh"
+
 if [ -z "$EMAIL" ]; then
     >&2 echo "EMAIL environment variable is undefined"
     exit 1

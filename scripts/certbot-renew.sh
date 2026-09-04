@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+source "$(dirname "$0")/defaults.sh"
+
 while [[ $# > 0 ]]; do
     case "$1" in
         --cert-name)
