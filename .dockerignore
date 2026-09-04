@@ -3,6 +3,7 @@ docs/
 Makefile
 README.md
 LICENSE.txt
+AGENTS.md
 .git/
 .vscode/
 .gitignore
