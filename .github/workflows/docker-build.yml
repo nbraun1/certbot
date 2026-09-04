@@ -6,7 +6,11 @@ on:
       - master
       - development
     tags:
-      - 'v*' # Matches tags like v1.0.0, v2.1.3, etc.
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build:
@@ -15,14 +19,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Log in to Docker Hub (only if on master branch or tag)
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ github.actor }}
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Log in to GitHub Container Registry (only if on master branch or tag)
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -44,11 +46,12 @@ jobs:
           images: |
             ${{ env.OWNER }}/${{ env.REPOSITORY }}
             ghcr.io/${{ env.OWNER }}/${{ env.REPOSITORY }}
-          # Generate Docker tags based on the following events/attributes
           tags: |
             type=semver,pattern={{raw}}
-            type=edge,branch=${{ github.event.repository.default_branch }}
-            type=edge,branch=development,suffix=-dev
+            type=raw,value=edge,enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value=edge-dev,enable=${{ github.ref == 'refs/heads/development' }}
+          flavor: |
+            latest=auto
         env:
           OWNER: "${{ github.repository_owner }}"
           REPOSITORY: "${{ github.event.repository.name }}"
