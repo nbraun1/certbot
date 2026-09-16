@@ -10,17 +10,17 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
-  build:
+  test:
+    name: Run unit tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.x'
 
@@ -30,23 +30,46 @@ jobs:
       - name: Run unit tests
         run: make -f Makefile.test test-unit
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+  build:
+    name: Build test image
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build test image
         run: make -f Makefile.test test-image
 
+  deploy-channel:
+    name: Deploy branch channel
+    needs: build
+    if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/development' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -54,24 +77,77 @@ jobs:
 
       - name: Docker meta
         id: docker_meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
-          # List of Docker images to use as base name for tags
           images: |
             ${{ env.OWNER }}/${{ env.REPOSITORY }}
             ghcr.io/${{ env.OWNER }}/${{ env.REPOSITORY }}
           tags: |
-            type=semver,pattern={{raw}}
             type=raw,value=edge,enable=${{ github.ref == 'refs/heads/master' }}
             type=raw,value=edge-dev,enable=${{ github.ref == 'refs/heads/development' }}
           flavor: |
-            latest=auto
+            latest=false
         env:
           OWNER: "${{ github.repository_owner }}"
           REPOSITORY: "${{ github.event.repository.name }}"
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.docker_meta.outputs.tags }}
+
+  deploy-release:
+    name: Deploy release
+    needs: build
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker meta
+        id: docker_meta
+        uses: docker/metadata-action@v6
+        with:
+          images: |
+            ${{ env.OWNER }}/${{ env.REPOSITORY }}
+            ghcr.io/${{ env.OWNER }}/${{ env.REPOSITORY }}
+          tags: |
+            type=semver,pattern={{raw}}
+            type=raw,value=latest
+          flavor: |
+            latest=false
+        env:
+          OWNER: "${{ github.repository_owner }}"
+          REPOSITORY: "${{ github.event.repository.name }}"
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
