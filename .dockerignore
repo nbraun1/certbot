@@ -1,6 +1,7 @@
 examples/
 docs/
-Makefile
+tests/
+Makefile.*
 README.md
 LICENSE.txt
 AGENTS.md
@@ -9,3 +10,5 @@ AGENTS.md
 .gitignore
 .github/
 .act/
+__pycache__/
+.pytest_cache/

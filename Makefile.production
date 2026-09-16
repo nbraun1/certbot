@@ -1,0 +1,41 @@
+.DEFAULT_GOAL := build
+
+MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+include $(MAKEFILE_DIR)Makefile.common
+
+.PHONY: build run dive git-release-tag clean
+
+build: check-buildx
+	$(DOCKER_BUILDX) build --load --tag "$(IMAGE)" "$(PROJECT_ROOT)"
+
+run: build
+	$(DOCKER) run --rm $(DOCKER_RUN_ARGS) "$(IMAGE)"
+
+dive:
+	@command -v "$(DIVE)" >/dev/null 2>&1 || { \
+		echo "Dive command not found: $(DIVE)" >&2; \
+		exit 1; \
+	}
+	$(DIVE) build -t "$(IMAGE)" "$(PROJECT_ROOT)"
+
+git-release-tag:
+	@set -e; \
+	version="$(RELEASE_VERSION)"; \
+	if [ -z "$$version" ]; then \
+		printf '%s' 'Enter a release version in semver format (for example, 1.2.3): '; \
+		IFS= read -r version; \
+	fi; \
+	if ! printf '%s\n' "$$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$$'; then \
+		echo "Invalid release version: $$version" >&2; \
+		exit 1; \
+	fi; \
+	tag="v$$version"; \
+	if git rev-parse --verify --quiet "refs/tags/$$tag" >/dev/null; then \
+		echo "Git tag already exists: $$tag" >&2; \
+		exit 1; \
+	fi; \
+	git tag "$$tag"; \
+	git push origin "$$tag"
+
+clean: check-docker
+	-$(DOCKER) image rm "$(IMAGE)"

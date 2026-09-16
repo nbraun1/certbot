@@ -1,0 +1,35 @@
+ifndef CERTBOT_MAKEFILE_COMMON_INCLUDED
+CERTBOT_MAKEFILE_COMMON_INCLUDED := 1
+
+PROJECT_ROOT := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
+DOCKER ?= docker
+DOCKER_BUILDX ?= $(DOCKER) buildx
+PYTHON ?= python3
+DIVE ?= dive
+
+IMAGE ?= nbraun1/certbot:latest
+TEST_IMAGE ?= nbraun1/certbot:test
+DOCKER_RUN_ARGS ?=
+RELEASE_VERSION ?=
+
+.PHONY: help check-docker check-buildx
+
+help:
+	@printf '%s\n' \
+		'Production: make -f Makefile.production [build|run|dive|git-release-tag|clean]' \
+		'Tests:      make -f Makefile.test [test|test-unit|test-image|clean]'
+
+check-docker:
+	@command -v "$(DOCKER)" >/dev/null 2>&1 || { \
+		echo "Docker command not found: $(DOCKER)" >&2; \
+		exit 1; \
+	}
+
+check-buildx: check-docker
+	@$(DOCKER_BUILDX) version >/dev/null 2>&1 || { \
+		echo "Docker Buildx is not available: $(DOCKER_BUILDX)" >&2; \
+		exit 1; \
+	}
+
+endif

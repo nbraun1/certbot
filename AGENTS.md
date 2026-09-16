@@ -22,8 +22,11 @@ This repository builds the `nbraun1/certbot` Alpine-based Docker image.
   `multiple-certificates.md`, and `development.md`.
 - `.github/workflows/docker-build.yml` builds and publishes multi-platform
   images. `.github/dependabot.yml` checks the Dockerfile base image weekly.
-- `Makefile` provides local build, run, image inspection, cleanup, and release
-  tag helpers. `LICENSE.txt` contains the project license.
+- `Makefile.common` contains shared Make variables and helper targets;
+  `Makefile.production` provides local build, run, image inspection, cleanup,
+  and release tag helpers; and `Makefile.test` provides Python unit tests and
+  Dockerfile image-build validation. `LICENSE.txt` contains the project
+  license.
 
 Keep executable runtime additions in `scripts/`. Every runtime script that can
 be invoked directly must preserve the defaults in `defaults.sh`; shell scripts
@@ -33,28 +36,32 @@ empty values, must not be overwritten by defaults.
 
 ## Build, Test, and Development Commands
 
-- `make build` builds `nbraun1/certbot:latest` locally.
-- `docker build -t nbraun1/certbot .` is the equivalent direct build command.
-- `make run` builds and starts the image; set the required environment variables
-  before using it for real certificate issuance.
+- `make -f Makefile.production build` builds `nbraun1/certbot:latest` locally.
+- `docker buildx build --load -t nbraun1/certbot .` is the equivalent direct
+  build command.
+- `make -f Makefile.production run` builds and starts the image; pass required
+  environment variables through `DOCKER_RUN_ARGS` before using it for real
+  certificate issuance.
 - `docker compose -f examples/docker-compose.yml up` exercises the basic
   documented configuration. Use `RUN_ONCE=1` and Certbot staging settings for
-  safe manual smoke tests.
-- `make dive` inspects image layers when [dive](https://github.com/wagoodman/dive)
-  is installed. `make clean` removes the local image.
+  safe manual checks.
+- `make -f Makefile.production dive` inspects image layers when
+  [dive](https://github.com/wagoodman/dive) is installed.
+- `make -f Makefile.production git-release-tag` creates and pushes a release
+  tag; use `RELEASE_VERSION=1.2.3` for non-interactive automation.
+- `make -f Makefile.production clean` removes the production image.
+- `make -f Makefile.test test-unit` runs the pytest unit tests.
+- `make -f Makefile.test test-image` builds the test image to validate the
+  Dockerfile.
+- `make -f Makefile.test test` runs the complete local test suite.
+- `make -f Makefile.test clean` removes the test image.
 
-There is no automated test suite. Before submitting a change, run the narrowest
-relevant checks, for example:
+Before submitting a change, run the narrowest relevant tests, for example:
 
 ```bash
-docker build --check .
-docker build -t nbraun1/certbot .
-bash -n scripts/*.sh
-python3 -m py_compile scripts/manage-multi-certificates.py
+make -f Makefile.test test-unit
+make -f Makefile.test test
 ```
-
-Run a relevant container or Compose scenario as well, using the staging ACME
-server for certificate-flow tests.
 
 ## Coding Style & Naming Conventions
 
@@ -89,8 +96,8 @@ new branch edge build through the existing workflow.
 Use brief, imperative commit subjects such as `Simplify Makefile` and
 `Update docker-build workflow`. Keep each commit focused. Pull requests should
 explain the runtime or image impact, identify affected environment variables,
-examples, documentation, tags, and platforms, and include the build or
-smoke-test commands and results. Update the relevant file in `docs/` and
+examples, documentation, tags, and platforms, and include the build and test
+commands and results. Update the relevant file in `docs/` and
 `examples/` whenever user-facing configuration changes.
 
 ## Security & Configuration

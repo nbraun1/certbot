@@ -1,0 +1,23 @@
+.DEFAULT_GOAL := test
+
+MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+include $(MAKEFILE_DIR)Makefile.common
+
+.PHONY: test test-unit test-image clean check-pytest
+
+check-pytest:
+	@$(PYTHON) -c 'import pytest' >/dev/null 2>&1 || { \
+		echo "pytest is not available to $(PYTHON)" >&2; \
+		exit 1; \
+	}
+
+test: test-unit test-image
+
+test-unit: check-pytest
+	"$(PYTHON)" -m pytest -q "$(PROJECT_ROOT)tests/python"
+
+test-image: check-buildx
+	$(DOCKER_BUILDX) build --load --tag "$(TEST_IMAGE)" "$(PROJECT_ROOT)"
+
+clean: check-docker
+	-$(DOCKER) image rm "$(TEST_IMAGE)"
