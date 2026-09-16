@@ -1,63 +1,89 @@
 #!/usr/bin/env python3
-import os
 import configparser as cp
-import subprocess as sp
+import os
+import subprocess
 
-ini_file = os.environ.get(
-    'MULTI_CERTIFICATES_INI_FILE',
-    '/etc/certbot/multi-certificates.ini',
-)
-# check if the file exists because the config parser ignores any errors
-# when opening and reading a file respectively
-if not os.path.exists(ini_file):
-    raise FileNotFoundError(f'{ini_file} not exists')
+DEFAULT_INI_FILE = '/etc/certbot/multi-certificates.ini'
 
-config_parser = cp.ConfigParser()
-# prevent config parser from making strings to lowercase
-config_parser.optionxform = str
-config_parser.read(ini_file)
 
-for section in config_parser.sections():
-    # map ItemsView to dictionary
-    opts = os.environ.copy()
+def read_config(ini_file):
+    """Read the multi-certificate configuration without changing option case."""
+    if not os.path.exists(ini_file):
+        raise FileNotFoundError(f'{ini_file} not exists')
+
+    config_parser = cp.ConfigParser()
+    config_parser.optionxform = str
+    config_parser.read(ini_file)
+    return config_parser
+
+
+def section_options(config_parser, section, environment):
+    """Merge process environment values with one INI section."""
+    opts = environment.copy()
     for key, val in config_parser.items(section):
         opts[key] = val
+    return opts
 
-    sp.run(['./scripts/certbot-certonly.sh'], stderr=sp.STDOUT, env=opts)
 
-    # run configure-crontab.sh if the RUN_ONCE environment variable is undefined
-    if opts.get('RUN_ONCE', '') == '':
-        # prepare existing renew options
-        renew_opts = opts.copy()
-        # if the CERT_NAME environment variable is undefined,
-        # we have to set the first value in the DOMAINS environment variable as its value
-        # to keep the renew individual
-        if renew_opts.get('CERT_NAME', '') == '':
-            renew_opts['CERT_NAME'] = renew_opts['DOMAINS'].split(',')[0]
+def renewal_options(options):
+    """Prepare renewal options, including the fallback certificate name."""
+    renew_options = options.copy()
+    if renew_options.get('CERT_NAME', '') == '':
+        renew_options['CERT_NAME'] = renew_options['DOMAINS'].split(',')[0]
+    return renew_options
 
-        # collect existing renew options in a list
-        # where each element is passed as argument to the renew script
-        renew_opts_args = [f'--cert-name "{renew_opts["CERT_NAME"]}"']
-        if renew_opts.get('QUIET', '') != '':
-            renew_opts_args += ['-q']
 
-        if renew_opts.get('PRE_HOOK_CMD', '') != '':
-            renew_opts_args += [f'--pre-hook "{renew_opts["PRE_HOOK_CMD"]}"']
+def renewal_arguments(options):
+    """Build the configure-crontab arguments for one certificate."""
+    renew_options = renewal_options(options)
 
-        if renew_opts.get('POST_HOOK_CMD', '') != '':
-            renew_opts_args += [f'--post-hook "{renew_opts["POST_HOOK_CMD"]}"']
+    renew_args = [f'--cert-name "{renew_options["CERT_NAME"]}"']
+    if renew_options.get('QUIET', '') != '':
+        renew_args += ['-q']
 
-        if renew_opts.get('DEPLOY_HOOK_CMD', '') != '':
-            renew_opts_args += [
-                f'--deploy-hook "{renew_opts["DEPLOY_HOOK_CMD"]}"']
+    if renew_options.get('PRE_HOOK_CMD', '') != '':
+        renew_args += [f'--pre-hook "{renew_options["PRE_HOOK_CMD"]}"']
 
-        if renew_opts.get('CERTBOT_RENEW_FLAGS', '') != '':
-            renew_opts_args += [
-                f'--certbot-renew-flags {renew_opts["CERTBOT_RENEW_FLAGS"]}']
+    if renew_options.get('POST_HOOK_CMD', '') != '':
+        renew_args += [f'--post-hook "{renew_options["POST_HOOK_CMD"]}"']
 
-        renew_args = ['./scripts/configure-crontab.sh']
-        renew_args.extend(renew_opts_args)
-        sp.run(renew_args, stderr=sp.STDOUT, env=renew_opts)
+    if renew_options.get('DEPLOY_HOOK_CMD', '') != '':
+        renew_args += [f'--deploy-hook "{renew_options["DEPLOY_HOOK_CMD"]}"']
 
-if config_parser.defaults().get('RUN_ONCE', '') == '':
-    os.execvp('crond', ['crond', '-f', '-L', '/var/log/letsencrypt/cron.log'])
+    if renew_options.get('CERTBOT_RENEW_FLAGS', '') != '':
+        renew_args += [
+            f'--certbot-renew-flags {renew_options["CERTBOT_RENEW_FLAGS"]}']
+
+    return renew_args
+
+
+def main(environment=None, runner=subprocess.run, execvp=os.execvp):
+    """Obtain and optionally schedule every certificate in the INI file."""
+    if environment is None:
+        environment = os.environ.copy()
+
+    ini_file = environment.get('MULTI_CERTIFICATES_INI_FILE', DEFAULT_INI_FILE)
+    config_parser = read_config(ini_file)
+
+    for section in config_parser.sections():
+        opts = section_options(config_parser, section, environment)
+
+        runner(
+            ['./scripts/certbot-certonly.sh'],
+            stderr=subprocess.STDOUT,
+            env=opts,
+        )
+
+        # Run configure-crontab.sh if RUN_ONCE is undefined for this section.
+        if opts.get('RUN_ONCE', '') == '':
+            renew_opts = renewal_options(opts)
+            renew_args = ['./scripts/configure-crontab.sh']
+            renew_args.extend(renewal_arguments(renew_opts))
+            runner(renew_args, stderr=subprocess.STDOUT, env=renew_opts)
+
+    if config_parser.defaults().get('RUN_ONCE', '') == '':
+        execvp('crond', ['crond', '-f', '-L', '/var/log/letsencrypt/cron.log'])
+
+
+if __name__ == '__main__':
+    main()
