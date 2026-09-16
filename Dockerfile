@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM alpine:3.21.3
+FROM alpine:3.24.1
 LABEL maintainer="Nico Braun <nico.braun.dev@gmx.de>"
 
 WORKDIR /
