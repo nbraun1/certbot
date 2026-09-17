@@ -69,7 +69,7 @@ and [GitHub Container Registry](https://ghcr.io/nbraun1/certbot) for both
 `linux/amd64` and `linux/arm64`:
 
 - `v1.2.3` and `latest` are published for releases created from tags such as `v1.2.3`.
-- `edge` is published for commits on `master`.
+- `edge` is published for commits on `main`.
 - `edge-dev` is published for commits on `development`.
 
 ## Volumes

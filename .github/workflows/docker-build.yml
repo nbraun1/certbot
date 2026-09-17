@@ -3,7 +3,7 @@ name: Build and Publish Docker Image
 on:
   push:
     branches:
-      - master
+      - main
       - development
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
@@ -47,7 +47,7 @@ jobs:
   deploy-channel:
     name: Deploy branch channel
     needs: build
-    if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/development' }}
+    if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/development' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -83,7 +83,7 @@ jobs:
             ${{ env.OWNER }}/${{ env.REPOSITORY }}
             ghcr.io/${{ env.OWNER }}/${{ env.REPOSITORY }}
           tags: |
-            type=raw,value=edge,enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value=edge,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=edge-dev,enable=${{ github.ref == 'refs/heads/development' }}
           flavor: |
             latest=false

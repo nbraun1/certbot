@@ -82,7 +82,7 @@ make -f Makefile.test test
 Keep the workflow small and limited to production requirements. It publishes
 `linux/amd64` and `linux/arm64` images to both Docker Hub and GHCR:
 
-- pushes to `master` publish `edge`;
+- pushes to `main` publish `edge`;
 - pushes to `development` publish `edge-dev`;
 - version tags such as `v1.2.3` publish the release tag and `latest`.
 
