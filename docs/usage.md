@@ -62,6 +62,32 @@ docker compose up
 
 The example uses [Docker Compose V2](https://docs.docker.com/compose/#compose-v2-and-the-new-docker-compose-command).
 
+### Run with nginx
+
+Set `EMAIL` and `DOMAINS` in the [nginx example](../examples/nginx/docker-compose.yml).
+Update both `server_name` directives and the certificate paths in
+[`server.conf`](../examples/nginx/config/server.conf). The certificate name is
+the first domain in `DOMAINS`, unless `CERT_NAME` is set. Allow inbound ports
+80 and 443.
+
+Keep the HTTPS block commented out until certificates exist. From the
+repository root, start nginx and obtain the certificates:
+
+```bash
+cd examples/nginx
+docker compose up -d nginx
+docker compose run --rm -e RUN_ONCE=1 certbot
+```
+
+After successful issuance, uncomment the HTTPS block in `config/server.conf`.
+Validate and reload nginx, then enable automatic renewal:
+
+```bash
+docker compose exec nginx nginx -t
+docker compose exec nginx nginx -s reload
+docker compose up -d certbot
+```
+
 ## Published Images
 
 Images are published to [Docker Hub](https://hub.docker.com/r/nbraun1/certbot)
