@@ -11,7 +11,7 @@ services:
       AUTHENTICATOR: webroot
       WEBROOT_PATH: /var/www/letsencrypt
       POST_HOOK_CMD: docker kill -s HUP $$(docker ps --filter "name=webserver" | awk '{print $$1}')
-      CRON: "* * * * *"
+      CRON: "0 0,12 * * *"
     volumes:
       - ./data/certbot/letsencrypt:/etc/letsencrypt
       - ./data/certbot/www:/var/www/letsencrypt

@@ -21,6 +21,8 @@ The INI file may contain an optional `DEFAULT` section and one or more
 domain-specific sections. Options in `DEFAULT` apply to every domain section.
 An option in a domain section overrides the same default. Use the environment
 variables listed in the [configuration reference](configuration.md).
+Automatic renewal starts only if `RUN_ONCE` is unset or empty for at least one
+certificate.
 
 ## Technical Background
 

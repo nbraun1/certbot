@@ -21,7 +21,7 @@ if [ -z "$ENABLE_MULTI_CERTIFICATES" ]; then
 
         # execute the crontab which we have configured previously
         # to ensure that the obtained certificates will be renewed
-        exec crond -f -L /var/log/letsencrypt/cron.log
+        exec ./scripts/run-crond.sh
     fi
 else
     # parse the INI file defined in the MULTI_CERTIFICATES_INI_FILE environment variable

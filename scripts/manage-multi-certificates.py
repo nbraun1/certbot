@@ -2,6 +2,7 @@
 import configparser as cp
 import os
 import subprocess
+import sys
 
 DEFAULT_INI_FILE = '/etc/certbot/multi-certificates.ini'
 
@@ -64,25 +65,40 @@ def main(environment=None, runner=subprocess.run, execvp=os.execvp):
 
     ini_file = environment.get('MULTI_CERTIFICATES_INI_FILE', DEFAULT_INI_FILE)
     config_parser = read_config(ini_file)
+    renewal_scheduled = False
 
     for section in config_parser.sections():
         opts = section_options(config_parser, section, environment)
 
-        runner(
-            ['./scripts/certbot-certonly.sh'],
-            stderr=subprocess.STDOUT,
-            env=opts,
-        )
+        try:
+            runner(
+                ['./scripts/certbot-certonly.sh'],
+                stderr=subprocess.STDOUT,
+                env=opts,
+                check=True,
+            )
 
-        # Run configure-crontab.sh if RUN_ONCE is undefined for this section.
-        if opts.get('RUN_ONCE', '') == '':
-            renew_opts = renewal_options(opts)
-            renew_args = ['./scripts/configure-crontab.sh']
-            renew_args.extend(renewal_arguments(renew_opts))
-            runner(renew_args, stderr=subprocess.STDOUT, env=renew_opts)
+            if opts.get('RUN_ONCE', '') == '':
+                renew_opts = renewal_options(opts)
+                renew_args = ['./scripts/configure-crontab.sh']
+                renew_args.extend(renewal_arguments(renew_opts))
+                runner(
+                    renew_args,
+                    stderr=subprocess.STDOUT,
+                    env=renew_opts,
+                    check=True,
+                )
+                renewal_scheduled = True
+        except subprocess.CalledProcessError as error:
+            print(
+                f'{os.path.basename(error.cmd[0])} failed for [{section}] '
+                f'(exit {error.returncode})',
+                file=sys.stderr,
+            )
+            raise SystemExit(error.returncode) from None
 
-    if config_parser.defaults().get('RUN_ONCE', '') == '':
-        execvp('crond', ['crond', '-f', '-L', '/var/log/letsencrypt/cron.log'])
+    if renewal_scheduled:
+        execvp('./scripts/run-crond.sh', ['./scripts/run-crond.sh'])
 
 
 if __name__ == '__main__':

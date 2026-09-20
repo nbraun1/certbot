@@ -1,4 +1,5 @@
 import importlib.util
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -80,8 +81,9 @@ def test_main_runs_certbot_for_each_section_without_starting_crond(
     )
     calls = []
 
-    def runner(args, stderr, env):
+    def runner(args, stderr, env, check=False):
         calls.append((args, env.copy()))
+        return subprocess.CompletedProcess(args, 0)
 
     def unexpected_execvp(*args):
         raise AssertionError('crond should not be started for RUN_ONCE')
@@ -120,8 +122,9 @@ def test_main_configures_cron_and_starts_scheduler_when_run_once_is_unset(
     calls = []
     exec_calls = []
 
-    def runner(args, stderr, env):
+    def runner(args, stderr, env, check=False):
         calls.append((args, env.copy()))
+        return subprocess.CompletedProcess(args, 0)
 
     def fake_execvp(file, args):
         exec_calls.append((file, args))
@@ -139,5 +142,112 @@ def test_main_configures_cron_and_starts_scheduler_when_run_once_is_unset(
     ]
     assert calls[1][1]['CERT_NAME'] == 'example.invalid'
     assert exec_calls == [
-        ('crond', ['crond', '-f', '-L', '/var/log/letsencrypt/cron.log'])
+        ('./scripts/run-crond.sh', ['./scripts/run-crond.sh'])
     ]
+
+
+@pytest.mark.parametrize(
+    ('failed_command', 'expected_commands'),
+    [
+        (
+            './scripts/certbot-certonly.sh',
+            ['./scripts/certbot-certonly.sh'],
+        ),
+        (
+            './scripts/configure-crontab.sh',
+            ['./scripts/certbot-certonly.sh', './scripts/configure-crontab.sh'],
+        ),
+    ],
+)
+def test_main_stops_on_failed_command(
+    manager,
+    tmp_path,
+    capsys,
+    failed_command,
+    expected_commands,
+):
+    ini_file = tmp_path / 'certificates.ini'
+    ini_file.write_text(
+        '[DEFAULT]\nEMAIL=default@example.invalid\n'
+        '[first]\nDOMAINS=first.example.invalid\n'
+        '[second]\nDOMAINS=second.example.invalid\n',
+        encoding='utf-8',
+    )
+    calls = []
+    exec_calls = []
+
+    def runner(args, stderr, env, check=False):
+        calls.append(args[0])
+        result = subprocess.CompletedProcess(
+            args, 42 if args[0] == failed_command else 0,
+        )
+        if check:
+            result.check_returncode()
+        return result
+
+    with pytest.raises(SystemExit) as error:
+        manager.main(
+            {'MULTI_CERTIFICATES_INI_FILE': str(ini_file)},
+            runner=runner,
+            execvp=lambda *args: exec_calls.append(args),
+        )
+
+    assert error.value.code == 42
+    assert calls == expected_commands
+    assert exec_calls == []
+    stderr = capsys.readouterr().err
+    assert 'first' in stderr
+    assert Path(failed_command).name in stderr
+    assert '42' in stderr
+
+
+@pytest.mark.parametrize(
+    ('environment', 'default_options', 'first_options', 'second_options',
+     'scheduled_domains'),
+    [
+        ({'RUN_ONCE': '1'}, '', '', '', []),
+        ({}, '', 'RUN_ONCE=1\n', 'RUN_ONCE=1\n', []),
+        ({}, 'RUN_ONCE=1\n', '', 'RUN_ONCE=\n', ['second.example.invalid']),
+        ({}, '', 'RUN_ONCE=1\n', '', ['second.example.invalid']),
+    ],
+    ids=['environment', 'all-sections', 'empty-override', 'mixed-sections'],
+)
+def test_main_starts_scheduler_only_for_effective_renewal_sections(
+    manager,
+    tmp_path,
+    environment,
+    default_options,
+    first_options,
+    second_options,
+    scheduled_domains,
+):
+    ini_file = tmp_path / 'certificates.ini'
+    ini_file.write_text(
+        '[DEFAULT]\nEMAIL=default@example.invalid\n'
+        f'{default_options}'
+        '[first]\nDOMAINS=first.example.invalid\n'
+        f'{first_options}'
+        '[second]\nDOMAINS=second.example.invalid\n'
+        f'{second_options}',
+        encoding='utf-8',
+    )
+    calls = []
+    exec_calls = []
+
+    def runner(args, stderr, env, check=False):
+        calls.append((args[0], env['DOMAINS']))
+        return subprocess.CompletedProcess(args, 0)
+
+    manager.main(
+        dict(environment, MULTI_CERTIFICATES_INI_FILE=str(ini_file)),
+        runner=runner,
+        execvp=lambda *args: exec_calls.append(args),
+    )
+
+    assert [domain for command, domain in calls
+            if command == './scripts/certbot-certonly.sh'] == [
+        'first.example.invalid', 'second.example.invalid',
+    ]
+    assert [domain for command, domain in calls
+            if command == './scripts/configure-crontab.sh'] == scheduled_domains
+    assert len(exec_calls) == (1 if scheduled_domains else 0)

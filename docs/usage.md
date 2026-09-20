@@ -2,6 +2,11 @@
 
 Ensure that each domain points to a valid IP address before starting Certbot.
 
+If issuance or scheduled renewal fails, the entire container exits with a
+nonzero status, including in multi-certificate mode. Check `docker logs <container>`,
+fix the cause, and restart. Use `--restart=no` (`restart: "no"` in Compose) to
+keep it stopped; automatic restarts retry.
+
 ## Run with `docker run`
 
 Run Certbot once:

@@ -1,7 +1,32 @@
 #!/bin/bash
 set -e
+set -o pipefail
 
 source "$(dirname "$0")/defaults.sh"
+
+stop_scheduler_on_failure() {
+    local exit_code=$?
+    if [ "$exit_code" -ne 0 ]; then
+        # A logging error must not prevent shutdown or replace the exit status.
+        set +e
+        printf '%s\n' "$exit_code" > "$CERTBOT_CROND_FAILURE_FILE"
+        printf 'Renewal failed for %s (exit %s); stopping the scheduler\n' \
+            "${CERT_NAME:-all certificates}" "$exit_code" >&2
+        kill -TERM "$CERTBOT_CROND_PID"
+    fi
+    exit "$exit_code"
+}
+
+if [[ "${CERTBOT_CROND_PID-}" =~ ^[0-9]+$ ]] &&
+    [ "$CERTBOT_CROND_PID" -gt 1 ] &&
+    [ -n "${CERTBOT_CROND_FAILURE_FILE-}" ]; then
+    # Cron invokes this script under flock, including this check and the trap.
+    if [ -f "$CERTBOT_CROND_FAILURE_FILE" ]; then
+        echo "Skipping renewal after an earlier failure" >&2
+        exit 1
+    fi
+    trap stop_scheduler_on_failure EXIT
+fi
 
 while [[ $# > 0 ]]; do
     case "$1" in
@@ -74,4 +99,5 @@ if [ ! -z "$CERTBOT_RENEW_FLAGS" ]; then
     certbot_params+=($CERTBOT_RENEW_FLAGS)
 fi
 
-certbot renew "${certbot_params[@]}" &>>/var/log/letsencrypt/renewal.log
+mkdir -p /var/log/letsencrypt
+certbot renew "${certbot_params[@]}" 2>&1 | tee -a /var/log/letsencrypt/renewal.log
